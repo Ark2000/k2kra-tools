@@ -1,0 +1,296 @@
+:root {
+  --paper: #fff6c2;
+  --bar: #fbe88f;
+  --ink: #3b3320;
+  --muted: #84764d;
+  --line: #e7d27a;
+  --hover: #00000014;
+  --accent: #a36a00;
+  --code: #00000010;
+  --danger: #b3261e;
+}
+
+:root[data-theme="dark"] {
+  --paper: #25231d;
+  --bar: #322f26;
+  --ink: #ece5d0;
+  --muted: #9c9478;
+  --line: #474334;
+  --hover: #ffffff17;
+  --accent: #f2c14e;
+  --code: #ffffff14;
+  --danger: #f2877f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.6 "Segoe UI", "Microsoft YaHei UI", sans-serif;
+}
+
+button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+#bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  background: var(--bar);
+  user-select: none;
+}
+
+#title {
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#title.dirty::after {
+  content: " •";
+  color: var(--accent);
+}
+
+#bar button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+#bar button:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+#bar button.active {
+  color: var(--accent);
+}
+
+#bar svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#bar svg .filled {
+  fill: currentColor;
+  stroke: none;
+}
+
+#banner {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+#banner[hidden] {
+  display: none;
+}
+
+#banner button {
+  margin-left: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+#banner button:hover {
+  background: var(--hover);
+}
+
+main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+#editor,
+#preview,
+#message {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+#editor {
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  font: 13.5px/1.6 "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 4;
+}
+
+#preview {
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+#message {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  text-align: center;
+}
+
+#status {
+  flex: none;
+  height: 20px;
+  padding: 0 10px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+#status.error {
+  color: var(--danger);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--line);
+}
+
+#preview > :first-child {
+  margin-top: 0;
+}
+
+#preview > :last-child {
+  margin-bottom: 0;
+}
+
+#preview h1,
+#preview h2,
+#preview h3,
+#preview h4 {
+  margin: 1em 0 0.4em;
+  line-height: 1.3;
+}
+
+#preview h1 {
+  font-size: 1.45em;
+}
+
+#preview h2 {
+  font-size: 1.25em;
+}
+
+#preview h3 {
+  font-size: 1.1em;
+}
+
+#preview p,
+#preview ul,
+#preview ol,
+#preview pre,
+#preview table,
+#preview blockquote {
+  margin: 0 0 0.7em;
+}
+
+#preview ul,
+#preview ol {
+  padding-left: 1.5em;
+}
+
+#preview .task-list-item {
+  list-style: none;
+  margin-left: -1.3em;
+}
+
+#preview a {
+  color: var(--accent);
+}
+
+#preview code {
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  background: var(--code);
+  font: 0.92em "Cascadia Mono", Consolas, monospace;
+}
+
+#preview pre {
+  padding: 8px 10px;
+  overflow-x: auto;
+  border-radius: 5px;
+  background: var(--code);
+}
+
+#preview pre code {
+  padding: 0;
+  background: none;
+}
+
+#preview blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+
+#preview table {
+  border-collapse: collapse;
+}
+
+#preview th,
+#preview td {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+}
+
+#preview hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}

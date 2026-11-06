@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sticky Editor</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <header id="bar" data-tauri-drag-region>
+      <span id="title" data-tauri-drag-region></span>
+      <button id="toggle-preview" title="Edit / Preview (Ctrl+E)" hidden>
+        <svg viewBox="0 0 16 16"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" /><circle cx="8" cy="8" r="2" /></svg>
+      </button>
+      <button id="toggle-pin" title="Always on top (Ctrl+T)">
+        <svg viewBox="0 0 16 16"><path d="M5.5 2h5M6.5 2v4.5L4 9.5h8L9.5 6.5V2M8 9.5V14" /></svg>
+      </button>
+      <button id="toggle-theme" title="Light / Dark">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" /><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11z" class="filled" /></svg>
+      </button>
+      <button id="close" title="Close (Ctrl+W)">
+        <svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+      </button>
+    </header>
+
+    <div id="banner" hidden>
+      <span id="banner-text"></span>
+      <span id="banner-actions"></span>
+    </div>
+
+    <main>
+      <textarea id="editor" spellcheck="false" autocomplete="off" hidden></textarea>
+      <article id="preview" hidden></article>
+      <div id="message" hidden></div>
+    </main>
+
+    <footer id="status"></footer>
+  </body>
+</html>
