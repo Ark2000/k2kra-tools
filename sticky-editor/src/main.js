@@ -24,6 +24,7 @@ let saving = null; // the in-flight save, if any
 let saveTimer = null;
 let blocked = false; // a conflict or deletion awaits the user; autosave is off
 let saveError = "";
+let missing = false; // the last disk check could not find the file
 
 // ---- rendering ------------------------------------------------------------
 
@@ -156,11 +157,23 @@ function showDeleted() {
   ]);
 }
 
+function resume() {
+  blocked = false;
+  hideBanner();
+  if (doc.notice) showBanner(doc.notice);
+  if (dirty) scheduleSave();
+}
+
 async function checkDisk() {
-  if (!doc || blocked || saving) return;
-  const result = await invoke("doc_check").catch(() => "same");
-  if (saving || blocked) return;
-  if (result === "deleted") showDeleted();
+  if (!doc || saving) return;
+  const result = await invoke("doc_check").catch(() => "unknown");
+  if (saving) return;
+  const wasMissing = missing;
+  missing = result === "deleted";
+  if (result === "same" && blocked) resume();
+  if (blocked) return;
+  // Sync clients can replace a file by deleting it first, so one miss proves nothing.
+  if (missing && wasMissing) showDeleted();
   else if (result === "changed") dirty ? showConflict() : await loadDoc();
 }
 

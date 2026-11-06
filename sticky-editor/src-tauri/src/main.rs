@@ -206,14 +206,13 @@ fn doc_save(
 /// `same`, `changed` or `deleted`, compared with what this window last saw.
 #[tauri::command(async)]
 fn doc_check(window: Window, state: tauri::State<AppState>) -> Result<&'static str, String> {
-    let sessions = state.sessions.lock().unwrap();
-    let Some(session) = sessions.get(window.label()) else { return Ok("same") };
-    let Some(doc) = &session.doc else { return Ok("same") };
-    let current = doc::stamp(&session.path).map_err(|e| e.to_string())?;
-    Ok(match (doc.stamp, current) {
-        (a, b) if a == b => "same",
-        (_, None) => "deleted",
-        _ => "changed",
+    let mut sessions = state.sessions.lock().unwrap();
+    let Some(session) = sessions.get_mut(window.label()) else { return Ok("same") };
+    let Some(doc) = &mut session.doc else { return Ok("same") };
+    Ok(match doc::refresh(&session.path, doc).map_err(|e| e.to_string())? {
+        doc::Disk::Same => "same",
+        doc::Disk::Changed => "changed",
+        doc::Disk::Deleted => "deleted",
     })
 }
 

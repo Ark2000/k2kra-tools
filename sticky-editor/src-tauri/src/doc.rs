@@ -3,7 +3,9 @@
 
 use encoding_rs::{Encoding as Legacy, UTF_16BE, UTF_16LE};
 use serde::Serialize;
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::SystemTime;
@@ -175,12 +177,44 @@ pub fn stamp(path: &Path) -> io::Result<Option<Stamp>> {
     }
 }
 
+fn digest(bytes: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
+}
+
 /// The open file, as of the last time it was read or written.
 pub struct Doc {
     pub encoding: Encoding,
     pub eol: Eol,
     pub stamp: Option<Stamp>,
+    /// Sync clients often rewrite a file or touch its timestamp without
+    /// changing it, so a new stamp alone proves nothing.
+    pub digest: Option<u64>,
     pub readonly: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Disk {
+    Same,
+    Changed,
+    Deleted,
+}
+
+/// Compares the file with what `doc` last saw, by content when the stamp differs.
+pub fn refresh(path: &Path, doc: &mut Doc) -> io::Result<Disk> {
+    let current = stamp(path)?;
+    if current == doc.stamp {
+        return Ok(Disk::Same);
+    }
+    if current.is_none() {
+        return Ok(Disk::Deleted);
+    }
+    if doc.digest != Some(digest(&fs::read(path)?)) {
+        return Ok(Disk::Changed);
+    }
+    doc.stamp = current;
+    Ok(Disk::Same)
 }
 
 pub struct Loaded {
@@ -198,6 +232,7 @@ pub fn load(path: &Path) -> Result<Loaded, String> {
             encoding: Encoding::Utf8 { bom: false },
             eol: Eol::Lf,
             stamp: None,
+            digest: None,
             readonly: false,
         };
         return Ok(Loaded { doc, text: String::new(), notice: None });
@@ -209,7 +244,8 @@ pub fn load(path: &Path) -> Result<Loaded, String> {
         return Err(format!("This file is too large (limit {} MB).", MAX_OPENABLE / 1024 / 1024));
     }
 
-    let decoded = decode(&fs::read(path).map_err(text_err)?)?;
+    let bytes = fs::read(path).map_err(text_err)?;
+    let decoded = decode(&bytes)?;
     let (readonly, notice) = if meta.permissions().readonly() {
         (true, Some("Read-only file: changes cannot be saved.".to_owned()))
     } else if meta.len() > MAX_EDITABLE {
@@ -222,7 +258,13 @@ pub fn load(path: &Path) -> Result<Loaded, String> {
     } else {
         (false, None)
     };
-    let doc = Doc { encoding: decoded.encoding, eol: decoded.eol, stamp: before, readonly };
+    let doc = Doc {
+        encoding: decoded.encoding,
+        eol: decoded.eol,
+        stamp: before,
+        digest: Some(digest(&bytes)),
+        readonly,
+    };
     Ok(Loaded { doc, text: decoded.text, notice })
 }
 
@@ -243,13 +285,13 @@ pub fn save(path: &Path, doc: &mut Doc, text: &str, force: bool) -> Result<(), S
     if doc.readonly {
         return Err(fail("readonly", "This file is read-only."));
     }
-    let current = stamp(path).map_err(|e| fail("io", e))?;
-    if !force && current != doc.stamp {
+    if !force && refresh(path, doc).map_err(|e| fail("io", e))? != Disk::Same {
         return Err(fail("conflict", "The file changed on disk."));
     }
     let bytes = encode(text, doc.encoding, doc.eol).map_err(|e| fail("encoding", e))?;
     write_atomic(path, &bytes).map_err(|e| fail("io", e))?;
     doc.stamp = stamp(path).map_err(|e| fail("io", e))?;
+    doc.digest = Some(digest(&bytes));
     Ok(())
 }
 
@@ -383,6 +425,28 @@ mod tests {
         save(&path, &mut doc, "three\n", true).unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"three\r\n");
         assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1, "temp file left behind");
+    }
+
+    #[test]
+    fn rewrite_with_identical_content_is_not_a_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("synced.md");
+        fs::write(&path, "one\n").unwrap();
+        let mut doc = load(&path).unwrap().doc;
+        save(&path, &mut doc, "two\n", false).unwrap();
+
+        // What a sync client does after uploading: same bytes, new timestamp.
+        let later = SystemTime::now() + std::time::Duration::from_secs(60);
+        fs::File::options().write(true).open(&path).unwrap().set_modified(later).unwrap();
+
+        assert_eq!(refresh(&path, &mut doc).unwrap(), Disk::Same);
+        save(&path, &mut doc, "three\n", false).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"three\n");
+
+        fs::write(&path, "other\n").unwrap();
+        assert_eq!(refresh(&path, &mut doc).unwrap(), Disk::Changed);
+        fs::remove_file(&path).unwrap();
+        assert_eq!(refresh(&path, &mut doc).unwrap(), Disk::Deleted);
     }
 
     #[test]
