@@ -11,6 +11,8 @@ const AUTOSAVE_MS = 1000;
 const RETRY_MS = 3000;
 const POLL_MS = 2000;
 const MARKDOWN = /\.(md|markdown|mdown|mkd)$/i;
+const COLORS = ["Yellow", "Pink", "Orange", "Green", "Blue", "Purple", "Gray"];
+const OPACITIES = [100, 90, 80, 70, 60, 50, 40, 30];
 
 const win = getCurrentWindow();
 const $ = (id) => document.getElementById(id);
@@ -27,6 +29,8 @@ let saveTimer = null;
 let blocked = false; // a conflict or deletion awaits the user; autosave is off
 let saveError = "";
 let missing = false; // the last disk check could not find the file
+let opacity = 100;
+let color = "yellow";
 
 // ---- rendering ------------------------------------------------------------
 
@@ -74,14 +78,24 @@ function showMessage(text) {
 }
 
 function applyOpacity(percent) {
+  opacity = percent;
   document.documentElement.style.setProperty("--alpha", percent / 100);
-  $("opacity").value = percent;
 }
 
 function changeOpacity(percent) {
   const clamped = Math.min(100, Math.max(30, percent));
   applyOpacity(clamped);
   invoke("set_opacity", { opacity: clamped / 100 });
+}
+
+function applyColor(name) {
+  color = name;
+  document.documentElement.dataset.color = name;
+}
+
+function changeColor(name) {
+  applyColor(name);
+  invoke("set_color", { color: name });
 }
 
 function fileLabel(path) {
@@ -241,6 +255,26 @@ const commands = {
         action: () => invoke("open_files", { paths: [path] }),
       };
     });
+    const noteItems = !doc
+      ? []
+      : [
+          {
+            text: "Color",
+            items: COLORS.map((name) => ({
+              text: name,
+              checked: name.toLowerCase() === color,
+              action: () => changeColor(name.toLowerCase()),
+            })),
+          },
+          {
+            text: "Opacity",
+            items: OPACITIES.map((percent) => ({
+              text: `${percent}%`,
+              checked: percent === opacity,
+              action: () => changeOpacity(percent),
+            })),
+          },
+        ];
     const autostart = await isEnabled();
     const menu = await Menu.new({
       items: [
@@ -255,6 +289,7 @@ const commands = {
           ],
         },
         { item: "Separator" },
+        ...noteItems,
         {
           text: "Dark theme",
           checked: document.documentElement.dataset.theme === "dark",
@@ -318,14 +353,13 @@ $("toggle-pin").addEventListener("click", commands.togglePin);
 $("menu").addEventListener("click", commands.menu);
 $("minimize").addEventListener("click", () => win.minimize());
 $("close").addEventListener("click", () => win.close());
-$("opacity").addEventListener("input", (event) => changeOpacity(Number(event.target.value)));
 
 document.addEventListener(
   "wheel",
   (event) => {
     if (!event.ctrlKey || !doc) return;
     event.preventDefault();
-    changeOpacity(Number($("opacity").value) + (event.deltaY < 0 ? 5 : -5));
+    changeOpacity(opacity + (event.deltaY < 0 ? 10 : -10));
   },
   { passive: false },
 );
@@ -337,6 +371,7 @@ async function start() {
   pinned = prefs.pinned;
   applyTheme(prefs.theme);
   applyOpacity(Math.round(prefs.opacity * 100));
+  applyColor(prefs.color);
   $("toggle-pin").classList.toggle("active", pinned);
 
   try {
@@ -347,7 +382,6 @@ async function start() {
       const markdown = MARKDOWN.test(doc.name);
       $("toggle-preview").hidden = !markdown;
       setMode(markdown && editor.value.length > 0);
-      $("opacity").hidden = false;
     } else {
       $("title").textContent = "Sticky Editor";
       showWelcome(await invoke("recent"));

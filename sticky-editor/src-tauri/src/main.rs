@@ -195,6 +195,7 @@ struct Prefs {
     theme: Option<String>,
     pinned: bool,
     opacity: f64,
+    color: String,
 }
 
 #[tauri::command]
@@ -202,7 +203,12 @@ fn prefs(window: Window, state: tauri::State<AppState>) -> Prefs {
     let key = state.sessions.lock().unwrap().get(window.label()).map(|s| s.key.clone());
     let store = state.store.lock().unwrap();
     let saved = key.and_then(|k| store.files.get(&k).cloned()).unwrap_or_default();
-    Prefs { theme: store.theme.clone(), pinned: saved.pinned, opacity: saved.opacity }
+    Prefs {
+        theme: store.theme.clone(),
+        pinned: saved.pinned,
+        opacity: saved.opacity,
+        color: saved.color,
+    }
 }
 
 /// Recently opened files that still exist.
@@ -220,6 +226,11 @@ fn clear_recent(state: tauri::State<AppState>) {
 #[tauri::command]
 fn set_opacity(window: Window, state: tauri::State<AppState>, opacity: f64) {
     remember(&window, &state, |file| file.opacity = opacity.clamp(0.3, 1.0));
+}
+
+#[tauri::command]
+fn set_color(window: Window, state: tauri::State<AppState>, color: String) {
+    remember(&window, &state, |file| file.color = color);
 }
 
 /// Returns `None` for the welcome window, which has no file.
@@ -370,6 +381,7 @@ fn main() {
             doc_check,
             set_pinned,
             set_opacity,
+            set_color,
             set_theme,
             open_files
         ])

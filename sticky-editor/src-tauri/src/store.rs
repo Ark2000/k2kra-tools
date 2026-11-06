@@ -15,11 +15,18 @@ pub struct FileState {
     pub size: Option<(u32, u32)>,
     pub pinned: bool,
     pub opacity: f64,
+    pub color: String,
 }
 
 impl Default for FileState {
     fn default() -> Self {
-        Self { position: None, size: None, pinned: true, opacity: 1.0 }
+        Self {
+            position: None,
+            size: None,
+            pinned: true,
+            opacity: 1.0,
+            color: "yellow".to_owned(),
+        }
     }
 }
 

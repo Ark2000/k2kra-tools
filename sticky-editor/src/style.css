@@ -22,6 +22,102 @@
   --danger: #f2877f;
 }
 
+:root[data-color="pink"] {
+  --paper: #ffe3ea;
+  --bar: #fcc9d6;
+  --line: #f0b0c2;
+  --muted: #8f5a69;
+  --accent: #b0305a;
+}
+
+:root[data-color="orange"] {
+  --paper: #ffe6cc;
+  --bar: #fdd2a6;
+  --line: #f0bd88;
+  --muted: #8c6740;
+  --accent: #b35c00;
+}
+
+:root[data-color="green"] {
+  --paper: #dcf5d9;
+  --bar: #c2ebbd;
+  --line: #a6d9a0;
+  --muted: #557a52;
+  --accent: #2a7a2a;
+}
+
+:root[data-color="blue"] {
+  --paper: #dbecff;
+  --bar: #c2dffc;
+  --line: #a6ccf0;
+  --muted: #54708f;
+  --accent: #1f66b8;
+}
+
+:root[data-color="purple"] {
+  --paper: #ebe3ff;
+  --bar: #dacffc;
+  --line: #c5b6f0;
+  --muted: #6c5f8f;
+  --accent: #6a3fc0;
+}
+
+:root[data-color="gray"] {
+  --paper: #f0f0ee;
+  --bar: #e0e0dc;
+  --line: #cdcdc8;
+  --muted: #73736e;
+  --accent: #555550;
+}
+
+:root[data-theme="dark"][data-color="pink"] {
+  --paper: #2b2024;
+  --bar: #3a2a30;
+  --line: #523a43;
+  --muted: #a58a93;
+  --accent: #f29ab5;
+}
+
+:root[data-theme="dark"][data-color="orange"] {
+  --paper: #2b231b;
+  --bar: #3a2e22;
+  --line: #524030;
+  --muted: #a8926f;
+  --accent: #f2a95e;
+}
+
+:root[data-theme="dark"][data-color="green"] {
+  --paper: #1f2820;
+  --bar: #29352a;
+  --line: #3a4c3b;
+  --muted: #8ea18f;
+  --accent: #7fd08a;
+}
+
+:root[data-theme="dark"][data-color="blue"] {
+  --paper: #1e2530;
+  --bar: #283140;
+  --line: #394759;
+  --muted: #8b9bb0;
+  --accent: #7fb6f2;
+}
+
+:root[data-theme="dark"][data-color="purple"] {
+  --paper: #241f30;
+  --bar: #302a40;
+  --line: #443b5a;
+  --muted: #9c91b3;
+  --accent: #b59cf2;
+}
+
+:root[data-theme="dark"][data-color="gray"] {
+  --paper: #242424;
+  --bar: #303030;
+  --line: #454545;
+  --muted: #9a9a9a;
+  --accent: #d0d0d0;
+}
+
 :root {
   --alpha: 1;
   --paper-glass: color-mix(in srgb, var(--paper) calc(var(--alpha) * 100%), transparent);
@@ -209,31 +305,17 @@ main {
   background: var(--hover);
 }
 
-footer {
-  display: flex;
+#status {
   flex: none;
-  gap: 8px;
-  align-items: center;
   height: 20px;
   padding: 0 10px;
-}
-
-#status {
-  flex: 1;
   overflow: hidden;
   color: var(--muted);
   font-size: 11px;
+  line-height: 20px;
   white-space: nowrap;
   text-overflow: ellipsis;
   user-select: none;
-}
-
-#opacity {
-  flex: none;
-  width: 60px;
-  height: 12px;
-  margin: 0;
-  accent-color: var(--accent);
 }
 
 #status.error {

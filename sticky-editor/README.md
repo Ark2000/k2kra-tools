@@ -8,9 +8,9 @@ Open any text file as a small floating note. Edits save themselves, and Markdown
 - After installing, right-click any file and choose **Open with Sticky Editor** (under "Show more options" on Windows 11).
 - Or drop files onto any window, or press `Ctrl+O`.
 
-Each file gets one window, which remembers its position, size, opacity and pin state.
+Each file gets one window, which remembers its position, size, color, opacity and pin state.
 
-The menu button holds your recent files and the dark theme. Notes you leave open come back when you sign in to Windows; closing a note takes it off that list. Turn this off with **Reopen notes at sign-in** in the menu.
+The menu button holds your recent files, the note's color and opacity, and the dark theme. Notes you leave open come back when you sign in to Windows; closing a note takes it off that list. Turn this off with **Reopen notes at sign-in** in the menu.
 
 | Shortcut | Action |
 |---|---|
@@ -19,7 +19,7 @@ The menu button holds your recent files and the dark theme. Notes you leave open
 | `Ctrl+S` | Save now |
 | `Ctrl+O` | Open a file |
 | `Ctrl+W` | Close |
-| `Ctrl+Wheel` | Change opacity (or use the slider at the bottom right) |
+| `Ctrl+Wheel` | Change opacity |
 
 Double-clicking the preview also returns to editing.
 
