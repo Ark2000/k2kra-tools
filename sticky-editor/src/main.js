@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Menu } from "@tauri-apps/api/menu";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { render } from "./markdown.js";
@@ -69,6 +71,39 @@ function showMessage(text) {
   $("message").hidden = false;
   editor.hidden = true;
   preview.hidden = true;
+}
+
+function applyOpacity(percent) {
+  document.documentElement.style.setProperty("--alpha", percent / 100);
+  $("opacity").value = percent;
+}
+
+function changeOpacity(percent) {
+  const clamped = Math.min(100, Math.max(30, percent));
+  applyOpacity(clamped);
+  invoke("set_opacity", { opacity: clamped / 100 });
+}
+
+function fileLabel(path) {
+  const parts = path.split(/[\\/]/);
+  return { name: parts.at(-1), folder: parts.at(-2) ?? "" };
+}
+
+function showWelcome(recent) {
+  const message = $("message");
+  const hint = document.createElement("p");
+  hint.textContent = "Drop a file here, or press Ctrl+O";
+  const list = document.createElement("div");
+  list.id = "recent";
+  for (const path of recent) {
+    const button = document.createElement("button");
+    button.textContent = fileLabel(path).name;
+    button.title = path;
+    button.addEventListener("click", () => invoke("open_files", { paths: [path] }));
+    list.append(button);
+  }
+  message.replaceChildren(hint, list);
+  message.hidden = false;
 }
 
 function applyTheme(theme) {
@@ -197,6 +232,43 @@ const commands = {
     const picked = await openDialog({ multiple: true });
     if (picked) await invoke("open_files", { paths: picked });
   },
+  async menu() {
+    const recent = await invoke("recent");
+    const recentItems = recent.map((path) => {
+      const { name, folder } = fileLabel(path);
+      return {
+        text: `${name}  —  ${folder}`.replaceAll("&", "&&"), // "&" marks a mnemonic
+        action: () => invoke("open_files", { paths: [path] }),
+      };
+    });
+    const autostart = await isEnabled();
+    const menu = await Menu.new({
+      items: [
+        { text: "Open…", action: commands.open },
+        {
+          text: "Recent",
+          enabled: recent.length > 0,
+          items: [
+            ...recentItems,
+            { item: "Separator" },
+            { text: "Clear list", action: () => invoke("clear_recent") },
+          ],
+        },
+        { item: "Separator" },
+        {
+          text: "Dark theme",
+          checked: document.documentElement.dataset.theme === "dark",
+          action: commands.toggleTheme,
+        },
+        {
+          text: "Reopen notes at sign-in",
+          checked: autostart,
+          action: () => (autostart ? disable() : enable()),
+        },
+      ],
+    });
+    await menu.popup();
+  },
 };
 
 const shortcuts = {
@@ -243,8 +315,20 @@ preview.addEventListener("click", (event) => {
 
 $("toggle-preview").addEventListener("click", commands.togglePreview);
 $("toggle-pin").addEventListener("click", commands.togglePin);
-$("toggle-theme").addEventListener("click", commands.toggleTheme);
+$("menu").addEventListener("click", commands.menu);
+$("minimize").addEventListener("click", () => win.minimize());
 $("close").addEventListener("click", () => win.close());
+$("opacity").addEventListener("input", (event) => changeOpacity(Number(event.target.value)));
+
+document.addEventListener(
+  "wheel",
+  (event) => {
+    if (!event.ctrlKey || !doc) return;
+    event.preventDefault();
+    changeOpacity(Number($("opacity").value) + (event.deltaY < 0 ? 5 : -5));
+  },
+  { passive: false },
+);
 
 // ---- startup --------------------------------------------------------------
 
@@ -252,6 +336,7 @@ async function start() {
   const prefs = await invoke("prefs");
   pinned = prefs.pinned;
   applyTheme(prefs.theme);
+  applyOpacity(Math.round(prefs.opacity * 100));
   $("toggle-pin").classList.toggle("active", pinned);
 
   try {
@@ -262,9 +347,10 @@ async function start() {
       const markdown = MARKDOWN.test(doc.name);
       $("toggle-preview").hidden = !markdown;
       setMode(markdown && editor.value.length > 0);
+      $("opacity").hidden = false;
     } else {
       $("title").textContent = "Sticky Editor";
-      showMessage("Drop a file here, or press Ctrl+O");
+      showWelcome(await invoke("recent"));
     }
   } catch (error) {
     $("title").textContent = "Cannot open file";

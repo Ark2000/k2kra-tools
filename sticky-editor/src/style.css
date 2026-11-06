@@ -22,6 +22,12 @@
   --danger: #f2877f;
 }
 
+:root {
+  --alpha: 1;
+  --paper-glass: color-mix(in srgb, var(--paper) calc(var(--alpha) * 100%), transparent);
+  --bar-glass: color-mix(in srgb, var(--bar) calc(var(--alpha) * 100%), transparent);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -36,7 +42,7 @@ body {
 body {
   display: flex;
   flex-direction: column;
-  background: var(--paper);
+  background: var(--paper-glass);
   color: var(--ink);
   font: 14px/1.6 "Segoe UI", "Microsoft YaHei UI", sans-serif;
 }
@@ -55,7 +61,7 @@ button {
   align-items: center;
   height: 30px;
   padding: 0 4px 0 10px;
-  background: var(--bar);
+  background: var(--bar-glass);
   user-select: none;
 }
 
@@ -171,23 +177,63 @@ main {
 }
 
 #message {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
   color: var(--muted);
   text-align: center;
 }
 
-#status {
+#message p {
+  margin: 0 0 10px;
+}
+
+#recent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+#recent button {
+  padding: 3px 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#recent button:hover {
+  background: var(--hover);
+}
+
+footer {
+  display: flex;
   flex: none;
+  gap: 8px;
+  align-items: center;
   height: 20px;
   padding: 0 10px;
+}
+
+#status {
+  flex: 1;
   overflow: hidden;
   color: var(--muted);
   font-size: 11px;
-  line-height: 20px;
   white-space: nowrap;
   text-overflow: ellipsis;
   user-select: none;
+}
+
+#opacity {
+  flex: none;
+  width: 60px;
+  height: 12px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 #status.error {

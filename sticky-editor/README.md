@@ -8,7 +8,9 @@ Open any text file as a small floating note. Edits save themselves, and Markdown
 - After installing, right-click any file and choose **Open with Sticky Editor** (under "Show more options" on Windows 11).
 - Or drop files onto any window, or press `Ctrl+O`.
 
-Each file gets one window, which remembers its position, size and pin state.
+Each file gets one window, which remembers its position, size, opacity and pin state.
+
+The menu button holds your recent files and the dark theme. Notes you leave open come back when you sign in to Windows; closing a note takes it off that list. Turn this off with **Reopen notes at sign-in** in the menu.
 
 | Shortcut | Action |
 |---|---|
@@ -17,6 +19,7 @@ Each file gets one window, which remembers its position, size and pin state.
 | `Ctrl+S` | Save now |
 | `Ctrl+O` | Open a file |
 | `Ctrl+W` | Close |
+| `Ctrl+Wheel` | Change opacity (or use the slider at the bottom right) |
 
 Double-clicking the preview also returns to editing.
 
@@ -24,7 +27,7 @@ Double-clicking the preview also returns to editing.
 
 - **Saves about a second after you stop typing**, by writing a temp file and swapping it in, so a crash can't leave a half-written file.
 - **Keeps the encoding, BOM and line endings** (UTF-8, UTF-16, GBK and other legacy encodings; CRLF, LF, CR). If you type a character the encoding can't represent, the save fails with a message rather than altering it.
-- **Never overwrites changes made elsewhere.** An unedited note reloads by itself; with unsaved edits you choose between **Reload** and **Keep mine**.
+- **Never overwrites changes made elsewhere.** An unedited note reloads by itself; with unsaved edits you choose between **Reload** and **Keep mine**. Sync clients that only touch a file's timestamp are ignored, because the check compares content.
 - **Opens read-only** when the file is marked read-only, is larger than 5 MB, or its encoding can't be detected with certainty. Mixed line endings are unified on save, and a notice says so when the file opens.
 - **Refuses** binary files and files over 20 MB.
 

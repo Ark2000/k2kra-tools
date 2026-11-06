@@ -9,14 +9,20 @@ use std::collections::HashMap;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 use store::{FileState, Store};
+use tauri_plugin_autostart::MacosLauncher;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder, Window, WindowEvent,
 };
 
 const WELCOME: &str = "welcome";
+/// Passed by the sign-in entry: reopen the last notes, or quietly do nothing.
+const RESTORE: &str = "--restore";
+const STORE_SAVE_INTERVAL: Duration = Duration::from_secs(2);
 
 /// The file behind one note window. Commands find it by window label, so the
 /// webview can only ever touch the file its window was opened on.
@@ -30,11 +36,30 @@ struct AppState {
     sessions: Mutex<HashMap<String, Session>>,
     store: Mutex<Store>,
     store_path: PathBuf,
+    store_dirty: AtomicBool,
 }
 
 impl AppState {
     fn save_store(&self) {
         self.store.lock().unwrap().save(&self.store_path);
+    }
+
+    /// Updates the store and leaves the write to `save_periodically`.
+    fn update_store(&self, update: impl FnOnce(&mut Store)) {
+        update(&mut self.store.lock().unwrap());
+        self.store_dirty.store(true, Ordering::Relaxed);
+    }
+}
+
+/// A system shutdown kills the process without closing its windows, so state
+/// can't wait for a window to close before reaching the disk.
+fn save_periodically(app: AppHandle) {
+    loop {
+        std::thread::sleep(STORE_SAVE_INTERVAL);
+        let state = app.state::<AppState>();
+        if state.store_dirty.swap(false, Ordering::Relaxed) {
+            state.save_store();
+        }
     }
 }
 
@@ -97,6 +122,7 @@ fn note_window(
     let window = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
         .title(title)
         .decorations(false)
+        .transparent(true)
         .always_on_top(saved.pinned)
         .inner_size(380.0, 420.0)
         .min_inner_size(220.0, 140.0)
@@ -139,6 +165,19 @@ fn paths_from_args(args: impl Iterator<Item = String>, cwd: &Path) -> Vec<PathBu
     args.map(|arg| resolve(&arg, cwd)).collect()
 }
 
+fn restore(app: &AppHandle) {
+    let paths: Vec<PathBuf> = {
+        let state = app.state::<AppState>();
+        let mut store = state.store.lock().unwrap();
+        store.open.retain(|p| Path::new(p).exists());
+        store.open.iter().map(PathBuf::from).collect()
+    };
+    if paths.is_empty() {
+        std::process::exit(0);
+    }
+    open_all(app, paths);
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DocView {
@@ -155,6 +194,7 @@ struct DocView {
 struct Prefs {
     theme: Option<String>,
     pinned: bool,
+    opacity: f64,
 }
 
 #[tauri::command]
@@ -162,7 +202,24 @@ fn prefs(window: Window, state: tauri::State<AppState>) -> Prefs {
     let key = state.sessions.lock().unwrap().get(window.label()).map(|s| s.key.clone());
     let store = state.store.lock().unwrap();
     let saved = key.and_then(|k| store.files.get(&k).cloned()).unwrap_or_default();
-    Prefs { theme: store.theme.clone(), pinned: saved.pinned }
+    Prefs { theme: store.theme.clone(), pinned: saved.pinned, opacity: saved.opacity }
+}
+
+/// Recently opened files that still exist.
+#[tauri::command]
+fn recent(state: tauri::State<AppState>) -> Vec<String> {
+    let store = state.store.lock().unwrap();
+    store.recent.iter().filter(|p| Path::new(p).exists()).cloned().collect()
+}
+
+#[tauri::command]
+fn clear_recent(state: tauri::State<AppState>) {
+    state.update_store(|store| store.recent.clear());
+}
+
+#[tauri::command]
+fn set_opacity(window: Window, state: tauri::State<AppState>, opacity: f64) {
+    remember(&window, &state, |file| file.opacity = opacity.clamp(0.3, 1.0));
 }
 
 /// Returns `None` for the welcome window, which has no file.
@@ -185,6 +242,7 @@ fn doc_load(window: Window, state: tauri::State<AppState>) -> Result<Option<DocV
     if let Some(session) = state.sessions.lock().unwrap().get_mut(window.label()) {
         session.doc = Some(loaded.doc);
     }
+    state.update_store(|store| store.note_opened(&view.path));
     Ok(Some(view))
 }
 
@@ -220,14 +278,12 @@ fn doc_check(window: Window, state: tauri::State<AppState>) -> Result<&'static s
 fn set_pinned(window: Window, state: tauri::State<AppState>, pinned: bool) -> Result<(), String> {
     window.set_always_on_top(pinned).map_err(|e| e.to_string())?;
     remember(&window, &state, |file| file.pinned = pinned);
-    state.save_store();
     Ok(())
 }
 
 #[tauri::command]
 fn set_theme(state: tauri::State<AppState>, theme: String) {
-    state.store.lock().unwrap().theme = Some(theme);
-    state.save_store();
+    state.update_store(|store| store.theme = Some(theme));
 }
 
 /// Async: creating a webview from a sync command deadlocks on Windows.
@@ -244,7 +300,7 @@ async fn open_files(app: AppHandle, window: Window, paths: Vec<String>) -> Resul
 fn remember(window: &Window, state: &AppState, update: impl FnOnce(&mut FileState)) {
     let key = state.sessions.lock().unwrap().get(window.label()).map(|s| s.key.clone());
     if let Some(key) = key {
-        update(state.store.lock().unwrap().files.entry(key).or_default());
+        state.update_store(|store| update(store.files.entry(key).or_default()));
     }
 }
 
@@ -259,7 +315,11 @@ fn on_window_event(window: &Window, event: &WindowEvent) {
             remember(window, &state, |file| file.size = Some((s.width, s.height)));
         }
         WindowEvent::Destroyed => {
-            state.sessions.lock().unwrap().remove(window.label());
+            let session = state.sessions.lock().unwrap().remove(window.label());
+            if let Some(session) = session {
+                let path = session.path.to_string_lossy();
+                state.update_store(|store| store.note_closed(&path));
+            }
             state.save_store();
         }
         _ => {}
@@ -269,12 +329,16 @@ fn on_window_event(window: &Window, event: &WindowEvent) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            if argv.iter().any(|arg| arg == RESTORE) {
+                return;
+            }
             let paths = paths_from_args(argv.into_iter().skip(1), Path::new(&cwd));
             let app = app.clone();
             tauri::async_runtime::spawn(async move { open_all(&app, paths) });
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![RESTORE])))
         .setup(|app| {
             let dir = app.path().app_config_dir()?;
             fs::create_dir_all(&dir)?;
@@ -283,14 +347,31 @@ fn main() {
                 sessions: Mutex::default(),
                 store: Mutex::new(Store::load(&store_path)),
                 store_path,
+                store_dirty: AtomicBool::new(false),
             });
-            let cwd = std::env::current_dir()?;
-            open_all(app.handle(), paths_from_args(std::env::args().skip(1), &cwd));
+            let handle = app.handle().clone();
+            std::thread::spawn(move || save_periodically(handle));
+
+            if std::env::args().any(|arg| arg == RESTORE) {
+                restore(app.handle());
+            } else {
+                let cwd = std::env::current_dir()?;
+                open_all(app.handle(), paths_from_args(std::env::args().skip(1), &cwd));
+            }
             Ok(())
         })
         .on_window_event(on_window_event)
         .invoke_handler(tauri::generate_handler![
-            prefs, doc_load, doc_save, doc_check, set_pinned, set_theme, open_files
+            prefs,
+            recent,
+            clear_recent,
+            doc_load,
+            doc_save,
+            doc_check,
+            set_pinned,
+            set_opacity,
+            set_theme,
+            open_files
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Sticky Editor");
