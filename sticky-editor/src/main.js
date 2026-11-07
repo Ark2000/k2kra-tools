@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { Menu } from "@tauri-apps/api/menu";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -13,6 +14,15 @@ const POLL_MS = 2000;
 const MARKDOWN = /\.(md|markdown|mdown|mkd)$/i;
 const COLORS = ["Yellow", "Pink", "Orange", "Green", "Blue", "Purple", "Gray"];
 const OPACITIES = [100, 90, 80, 70, 60, 50, 40, 30];
+const REPO = "https://github.com/Ark2000/k2kra-tools/tree/main/sticky-editor";
+const ABOUT = `Open any text file as a floating note. Edits save themselves, and Markdown files render in place.
+
+Ctrl+E   Switch between edit and preview
+Ctrl+T   Toggle always on top
+Ctrl+S   Save now
+Ctrl+O   Open a file
+Ctrl+W   Close
+Ctrl+Wheel   Change opacity`;
 
 const win = getCurrentWindow();
 const $ = (id) => document.getElementById(id);
@@ -229,6 +239,17 @@ const commands = {
     const picked = await openDialog({ multiple: true });
     if (picked) await invoke("open_files", { paths: picked });
   },
+  async about() {
+    const version = await getVersion();
+    const github = await ask(`Version ${version}
+
+${ABOUT}`, {
+      title: "About Sticky Editor",
+      okLabel: "GitHub",
+      cancelLabel: "Close",
+    });
+    if (github) await openUrl(REPO);
+  },
   async menu() {
     const recent = await invoke("recent");
     const recentItems = recent.map((path) => {
@@ -283,6 +304,8 @@ const commands = {
           checked: autostart,
           action: () => (autostart ? disable() : enable()),
         },
+        { item: "Separator" },
+        { text: "About Sticky Editor", action: commands.about },
       ],
     });
     await menu.popup();

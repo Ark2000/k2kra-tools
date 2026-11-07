@@ -11,7 +11,7 @@ Open any text file as a small floating note. Edits save themselves, and Markdown
 
 Each file gets one window, which remembers its position, size, color, opacity and pin state.
 
-The menu button holds your recent files, the note's color and opacity, and the dark theme. Notes you leave open come back when you sign in to Windows; closing a note takes it off that list. Turn this off with **Reopen notes at sign-in** in the menu.
+The menu button holds your recent files, the note's color and opacity, the dark theme, and an About box with the version and shortcuts. Notes you leave open come back when you sign in to Windows; closing a note takes it off that list. Turn this off with **Reopen notes at sign-in** in the menu.
 
 | Shortcut | Action |
 |---|---|
