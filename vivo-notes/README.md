@@ -49,17 +49,19 @@ data\
 ## Automatic sync
 
 ```powershell
-# Register: sync at sign-in and every 15 minutes
+# Register: sync at sign-in and every 30 minutes
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install-task.ps1
 
 # Choose another interval
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-task.ps1 -IntervalMinutes 60
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-task.ps1 -IntervalMinutes 15
 
 # Remove the task
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install-task.ps1 -Remove
 ```
 
 Task name: `vivo-notes-sync`. It runs only while you are signed in, because the Office Suite service runs in your session.
+
+The task starts through `sync-hidden.vbs` (`wscript.exe`), so no console window is created and focus is never taken. `powershell.exe -WindowStyle Hidden` is not enough: it still flashes a console for a moment, which can interrupt a fullscreen game. The script also skips the run entirely while Apex Legends (`r5apex.exe` / `r5apex_dx12.exe`) is running, and lowers its own priority.
 
 ## Notes
 

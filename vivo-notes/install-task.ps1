@@ -20,13 +20,14 @@
 #>
 [CmdletBinding()]
 param(
-    [int]$IntervalMinutes = 15,
+    [int]$IntervalMinutes = 30,
     [switch]$Remove
 )
 
 $ErrorActionPreference = 'Stop'
 $TaskName = 'vivo-notes-sync'
 $ScriptPath = Join-Path $PSScriptRoot 'sync-notes.ps1'
+$LauncherPath = Join-Path $PSScriptRoot 'sync-hidden.vbs'
 
 if ($Remove) {
     $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
@@ -43,13 +44,19 @@ if (-not (Test-Path -LiteralPath $ScriptPath)) {
     Write-Host "Cannot find sync-notes.ps1 next to this script."
     exit 1
 }
+if (-not (Test-Path -LiteralPath $LauncherPath)) {
+    Write-Host "Cannot find sync-hidden.vbs next to this script."
+    exit 1
+}
 if ($IntervalMinutes -lt 1) {
     Write-Host "IntervalMinutes must be at least 1."
     exit 1
 }
 
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Quiet"
+# Launch through wscript (a GUI-subsystem host), so no console window is ever created.
+# powershell.exe -WindowStyle Hidden still flashes a console for a moment.
+$action = New-ScheduledTaskAction -Execute 'wscript.exe' `
+    -Argument ('//B //Nologo "{0}"' -f $LauncherPath)
 
 $triggerLogon = New-ScheduledTaskTrigger -AtLogOn
 $triggerRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `

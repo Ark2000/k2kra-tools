@@ -366,6 +366,19 @@ function Format-NoteMarkdown {
 }
 
 # ---------------------------------------------------------------- 同步
+
+# 全屏游戏运行时直接跳过：抢焦点会害人，笔记晚几分钟同步没有关系
+$gameProcesses = @('r5apex', 'r5apex_dx12')
+$runningGame = Get-Process -Name $gameProcesses -ErrorAction SilentlyContinue
+if ($runningGame) {
+    Write-SyncLog "检测到游戏正在运行（$($runningGame[0].ProcessName)），本次跳过同步。"
+    exit 0
+}
+
+try {
+    [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal
+} catch { }
+
 $lock = $null
 try {
     $lock = [System.IO.File]::Open($script:LockFile, 'OpenOrCreate', 'ReadWrite', 'None')
