@@ -286,25 +286,6 @@ main {
   margin: 0 0 10px;
 }
 
-#recent {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-#recent button {
-  padding: 3px 8px;
-  overflow: hidden;
-  border-radius: 4px;
-  color: var(--ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#recent button:hover {
-  background: var(--hover);
-}
-
 #status {
   flex: none;
   height: 20px;

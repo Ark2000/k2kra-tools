@@ -7,6 +7,7 @@ Open any text file as a small floating note. Edits save themselves, and Markdown
 - `sticky-editor notes.md` opens a file. A path that doesn't exist yet is created on the first edit.
 - After installing, right-click any file and choose **Open with Sticky Editor** (under "Show more options" on Windows 11).
 - Or drop files onto any window, or press `Ctrl+O`.
+- Starting it without a file opens the last file you used.
 
 Each file gets one window, which remembers its position, size, color, opacity and pin state.
 

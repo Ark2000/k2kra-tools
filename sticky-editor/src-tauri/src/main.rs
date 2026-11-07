@@ -150,9 +150,19 @@ fn on_screen(window: &WebviewWindow, (x, y): (i32, i32)) -> bool {
     })
 }
 
+/// The most recently opened file that still exists.
+fn last_file(app: &AppHandle) -> Option<PathBuf> {
+    let state = app.state::<AppState>();
+    let store = state.store.lock().unwrap();
+    store.recent.iter().find(|p| Path::new(p).exists()).map(PathBuf::from)
+}
+
 fn open_all(app: &AppHandle, paths: Vec<PathBuf>) {
     let result = if paths.is_empty() {
-        open_welcome(app)
+        match last_file(app) {
+            Some(path) => open_file(app, path),
+            None => open_welcome(app),
+        }
     } else {
         paths.into_iter().try_for_each(|path| open_file(app, path))
     };

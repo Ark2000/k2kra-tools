@@ -103,23 +103,6 @@ function fileLabel(path) {
   return { name: parts.at(-1), folder: parts.at(-2) ?? "" };
 }
 
-function showWelcome(recent) {
-  const message = $("message");
-  const hint = document.createElement("p");
-  hint.textContent = "Drop a file here, or press Ctrl+O";
-  const list = document.createElement("div");
-  list.id = "recent";
-  for (const path of recent) {
-    const button = document.createElement("button");
-    button.textContent = fileLabel(path).name;
-    button.title = path;
-    button.addEventListener("click", () => invoke("open_files", { paths: [path] }));
-    list.append(button);
-  }
-  message.replaceChildren(hint, list);
-  message.hidden = false;
-}
-
 function applyTheme(theme) {
   document.documentElement.dataset.theme =
     theme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -384,7 +367,7 @@ async function start() {
       setMode(markdown && editor.value.length > 0);
     } else {
       $("title").textContent = "Sticky Editor";
-      showWelcome(await invoke("recent"));
+      showMessage("Drop a file here, or press Ctrl+O");
     }
   } catch (error) {
     $("title").textContent = "Cannot open file";
