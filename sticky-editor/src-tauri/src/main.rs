@@ -14,14 +14,17 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
-use store::{FileState, Store};
+use store::{FileState, Profile, Store};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri::{
-    AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
+    utils::config::WindowEffectsConfig,
+    window::{Color, Effect, EffectsBuilder},
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder, Window, WindowEvent,
 };
 
 const WELCOME: &str = "welcome";
+const SETTINGS: &str = "settings";
 /// Passed by the sign-in entry: reopen the last notes, or quietly do nothing.
 const RESTORE: &str = "--restore";
 const STORE_SAVE_INTERVAL: Duration = Duration::from_secs(2);
@@ -105,13 +108,20 @@ fn open_file(app: &AppHandle, path: PathBuf) -> tauri::Result<()> {
     }
     let state = app.state::<AppState>();
     let saved = {
-        let store = state.store.lock().unwrap();
-        store.files.get(&key).cloned().unwrap_or_default()
+        let mut store = state.store.lock().unwrap();
+        let fresh = store.new_file_state();
+        store.files.entry(key.clone()).or_insert(fresh).clone()
     };
     let title = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     state.sessions.lock().unwrap().insert(label.clone(), Session { path, key, doc: None });
     note_window(app, &label, &title, &saved)?;
     Ok(())
+}
+
+/// Only a translucent note has anything to blur; an opaque one skips the cost.
+fn glass_effects(saved: &FileState) -> Option<WindowEffectsConfig> {
+    (saved.glass && saved.opacity < 1.0)
+        .then(|| EffectsBuilder::new().effect(Effect::Acrylic).color(Color(255, 255, 255, 1)).build())
 }
 
 /// Built hidden; the page shows it once it has content, to avoid a blank flash.
@@ -131,6 +141,7 @@ fn note_window(
         .visible(false)
         .build()?;
 
+    window.set_effects(glass_effects(saved))?;
     if let Some((w, h)) = saved.size {
         window.set_size(PhysicalSize::new(w, h))?;
     }
@@ -208,18 +219,24 @@ struct Prefs {
     pinned: bool,
     opacity: f64,
     color: String,
+    glass: bool,
+    profile: Option<String>,
 }
 
 #[tauri::command]
 fn prefs(window: Window, state: tauri::State<AppState>) -> Prefs {
     let key = state.sessions.lock().unwrap().get(window.label()).map(|s| s.key.clone());
     let store = state.store.lock().unwrap();
-    let saved = key.and_then(|k| store.files.get(&k).cloned()).unwrap_or_default();
+    let saved = key
+        .and_then(|k| store.files.get(&k).cloned())
+        .unwrap_or_else(|| store.new_file_state());
     Prefs {
-        theme: store.theme.clone(),
+        theme: saved.theme.or_else(|| store.theme.clone()),
         pinned: saved.pinned,
         opacity: saved.opacity,
         color: saved.color,
+        glass: saved.glass,
+        profile: saved.profile,
     }
 }
 
@@ -237,12 +254,109 @@ fn clear_recent(state: tauri::State<AppState>) {
 
 #[tauri::command]
 fn set_opacity(window: Window, state: tauri::State<AppState>, opacity: f64) {
-    remember(&window, &state, |file| file.opacity = opacity.clamp(0.3, 1.0));
+    remember(&window, &state, |file| {
+        file.opacity = opacity.clamp(0.3, 1.0);
+        file.profile = None;
+    });
+    refresh_glass(window.app_handle(), window.label());
+}
+
+#[tauri::command]
+fn set_glass(window: Window, state: tauri::State<AppState>, glass: bool) {
+    remember(&window, &state, |file| {
+        file.glass = glass;
+        file.profile = None;
+    });
+    refresh_glass(window.app_handle(), window.label());
+}
+
+fn refresh_glass(app: &AppHandle, label: &str) {
+    let state = app.state::<AppState>();
+    let key = state.sessions.lock().unwrap().get(label).map(|s| s.key.clone());
+    let saved = key.and_then(|k| state.store.lock().unwrap().files.get(&k).cloned());
+    if let (Some(saved), Some(window)) = (saved, app.get_webview_window(label)) {
+        if let Err(e) = window.set_effects(glass_effects(&saved)) {
+            eprintln!("could not change glass: {e}");
+        }
+    }
+}
+
+/// Tells every open note to take on its look again.
+fn visuals_changed(app: &AppHandle) {
+    let labels: Vec<String> =
+        app.state::<AppState>().sessions.lock().unwrap().keys().cloned().collect();
+    for label in labels {
+        refresh_glass(app, &label);
+    }
+    let _ = app.emit("visual-changed", ());
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProfileList {
+    profiles: Vec<Profile>,
+    default_profile: String,
+}
+
+#[tauri::command]
+fn profiles(state: tauri::State<AppState>) -> ProfileList {
+    let store = state.store.lock().unwrap();
+    ProfileList { profiles: store.profiles.clone(), default_profile: store.default_profile.clone() }
+}
+
+#[tauri::command]
+fn save_profile(app: AppHandle, state: tauri::State<AppState>, profile: Profile) {
+    state.update_store(|store| store.save_profile(profile));
+    visuals_changed(&app);
+}
+
+#[tauri::command]
+fn delete_profile(app: AppHandle, state: tauri::State<AppState>, id: String) {
+    state.update_store(|store| {
+        store.delete_profile(&id);
+    });
+    visuals_changed(&app);
+}
+
+#[tauri::command]
+fn set_default_profile(state: tauri::State<AppState>, id: String) {
+    state.update_store(|store| store.default_profile = id);
+}
+
+/// Makes this window's note follow a profile.
+#[tauri::command]
+fn use_profile(window: Window, state: tauri::State<AppState>, id: String) {
+    let profile = state.store.lock().unwrap().profile(&id).cloned();
+    if let Some(profile) = profile {
+        remember(&window, &state, |file| profile.apply_to(file));
+        visuals_changed(window.app_handle());
+    }
+}
+
+/// Async: creating a webview from a sync command deadlocks on Windows.
+#[tauri::command]
+async fn open_settings(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(SETTINGS) {
+        focus(&window);
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(&app, SETTINGS, WebviewUrl::App("settings.html".into()))
+        .title("Sticky Editor Settings")
+        .always_on_top(true)
+        .inner_size(520.0, 380.0)
+        .min_inner_size(420.0, 320.0)
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
 fn set_color(window: Window, state: tauri::State<AppState>, color: String) {
-    remember(&window, &state, |file| file.color = color);
+    remember(&window, &state, |file| {
+        file.color = color;
+        file.profile = None;
+    });
 }
 
 /// Returns `None` for the welcome window, which has no file.
@@ -313,8 +427,13 @@ fn set_pinned(window: Window, state: tauri::State<AppState>, pinned: bool) -> Re
 }
 
 #[tauri::command]
-fn set_theme(state: tauri::State<AppState>, theme: String) {
+fn set_theme(window: Window, state: tauri::State<AppState>, theme: String) {
     state.update_store(|store| store.theme = Some(theme));
+    remember(&window, &state, |file| {
+        if file.theme.take().is_some() {
+            file.profile = None;
+        }
+    });
 }
 
 /// Async: creating a webview from a sync command deadlocks on Windows.
@@ -344,6 +463,13 @@ fn on_window_event(window: &Window, event: &WindowEvent) {
         }
         WindowEvent::Resized(s) if s.width > 0 && s.height > 0 => {
             remember(window, &state, |file| file.size = Some((s.width, s.height)));
+        }
+        // Without this the glass goes solid until the next check.
+        #[cfg(windows)]
+        WindowEvent::Focused(false) if window.label() != SETTINGS => {
+            if let Ok(hwnd) = window.hwnd() {
+                topmost::keep_backdrop(hwnd.0 as _);
+            }
         }
         WindowEvent::Destroyed => {
             let session = state.sessions.lock().unwrap().remove(window.label());
@@ -408,6 +534,13 @@ fn main() {
             set_pinned,
             set_opacity,
             set_color,
+            set_glass,
+            profiles,
+            save_profile,
+            delete_profile,
+            set_default_profile,
+            use_profile,
+            open_settings,
             set_theme,
             open_files
         ])

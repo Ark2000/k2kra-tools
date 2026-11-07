@@ -11,7 +11,7 @@ Open any text file as a small floating note. Edits save themselves, and Markdown
 
 Each file gets one window, which remembers its position, size, color, opacity and pin state.
 
-The menu button holds your recent files, the note's color and opacity, the dark theme, and an About box with the version and shortcuts. Notes you leave open come back when you sign in to Windows; closing a note takes it off that list. Turn this off with **Reopen notes at sign-in** in the menu.
+The menu button holds your recent files, the note's visual profile, color, opacity and frosted glass (a translucent note blurs what's behind it), the dark theme, settings, and an About box with the version and shortcuts. Notes you leave open come back when you sign in to Windows; closing a note takes it off that list. Turn this off with **Reopen notes at sign-in** in the menu.
 
 | Shortcut | Action |
 |---|---|
@@ -23,6 +23,10 @@ The menu button holds your recent files, the note's color and opacity, the dark 
 | `Ctrl+Wheel` | Change opacity |
 
 Markdown files open in the preview. Double-click it to edit, or tick a checkbox right there; the change saves like any other edit.
+
+## Visual profiles
+
+A profile is a named look: theme, color, opacity and frosted glass. Create and edit them under **Settings…** in the menu, and pick one for a note under **Visual profile**. Notes following a profile update as you change it. Changing a note's look by hand affects that note only, and it stops following the profile. New notes start with the profile marked **Use for new notes**.
 
 ## How it treats your files
 

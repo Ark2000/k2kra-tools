@@ -9,9 +9,9 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetWindow, GetWindowLongPtrW, GetWindowRect, IsWindowVisible, SetWindowPos, GWL_EXSTYLE,
-    GW_HWNDPREV, GW_OWNER, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    GetWindow, GetWindowLongPtrW, GetWindowRect, IsWindowVisible, PostMessageW, SetWindowPos,
+    GWL_EXSTYLE, GW_HWNDPREV, GW_OWNER, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    WM_NCACTIVATE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 const CHECK_INTERVAL: Duration = Duration::from_millis(500);
@@ -19,12 +19,17 @@ const CHECK_INTERVAL: Duration = Duration::from_millis(500);
 pub fn keep_pinned_on_top(app: AppHandle) {
     loop {
         thread::sleep(CHECK_INTERVAL);
-        let notes: Vec<HWND> = app
-            .webview_windows()
+        let windows = app.webview_windows();
+        let notes: Vec<HWND> = windows
             .values()
             .filter_map(|window| window.hwnd().ok())
             .map(|hwnd| hwnd.0 as HWND)
             .collect();
+        for window in windows.values().filter(|window| window.label() != crate::SETTINGS) {
+            if let Ok(hwnd) = window.hwnd() {
+                keep_backdrop(hwnd.0 as HWND);
+            }
+        }
         for &note in &notes {
             // SAFETY: the calls only read or reorder window handles, and Windows
             // rejects a handle that has since been destroyed.
@@ -35,6 +40,16 @@ pub fn keep_pinned_on_top(app: AppHandle) {
                 }
             }
         }
+    }
+}
+
+/// Windows turns a backdrop solid on inactive windows, which is most of a
+/// note's life. Telling the window it still looks active keeps the glass, and
+/// leaves keyboard focus where it is.
+pub fn keep_backdrop(hwnd: HWND) {
+    // SAFETY: posting to a destroyed handle fails harmlessly.
+    unsafe {
+        PostMessageW(hwnd, WM_NCACTIVATE, 1, 0);
     }
 }
 

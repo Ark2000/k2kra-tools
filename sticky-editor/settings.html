@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sticky Editor Settings</title>
+    <link rel="stylesheet" href="/src/settings.css" />
+    <script type="module" src="/src/settings.js"></script>
+  </head>
+  <body>
+    <aside>
+      <h1>Visual profiles</h1>
+      <div id="profiles" role="listbox" aria-label="Visual profiles"></div>
+      <div id="profile-actions">
+        <button id="add" type="button">New</button>
+        <button id="remove" type="button">Delete</button>
+      </div>
+    </aside>
+    <form id="form">
+      <label>
+        <span>Name</span>
+        <input id="name" type="text" maxlength="40" autocomplete="off" spellcheck="false" />
+      </label>
+      <label>
+        <span>Theme</span>
+        <select id="theme">
+          <option value="">Follow the app</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <div class="row">
+        <span>Color</span>
+        <div id="colors" role="radiogroup" aria-label="Color"></div>
+      </div>
+      <label>
+        <span>Opacity</span>
+        <input id="opacity" type="range" min="30" max="100" step="5" aria-label="Opacity" />
+        <output id="opacity-value"></output>
+      </label>
+      <label class="check">
+        <input id="glass" type="checkbox" />
+        <span>Frosted glass</span>
+      </label>
+      <p class="hint">Blurs what's behind a note. Needs opacity below 100%.</p>
+      <label class="check">
+        <input id="default" type="checkbox" />
+        <span>Use for new notes</span>
+      </label>
+      <p class="hint">Notes following this profile update as you change it.</p>
+    </form>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+:root {
+  --accent: #1f66b8;
+  --line: #00000022;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #7fb6f2;
+    --line: #ffffff22;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  background: Canvas;
+  color: CanvasText;
+  font: 13px/1.5 "Segoe UI", "Microsoft YaHei UI", sans-serif;
+}
+
+button,
+input,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+aside {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 170px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0 6px 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#profiles {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: auto;
+}
+
+#profiles button {
+  flex: none;
+  padding: 5px 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#profiles button:hover {
+  background: var(--line);
+}
+
+#profiles button[aria-selected="true"] {
+  background: var(--accent);
+  color: Canvas;
+}
+
+#profile-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+#profile-actions button {
+  flex: 1;
+  padding: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+
+#profile-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+form {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 20px;
+  overflow: auto;
+}
+
+form > label,
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  margin-bottom: 8px;
+}
+
+form > label > span:first-child,
+.row > span {
+  flex: none;
+  width: 58px;
+}
+
+#name,
+#theme {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: Canvas;
+}
+
+#opacity {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+#opacity-value {
+  width: 38px;
+  text-align: right;
+}
+
+#colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#colors button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+#colors button[aria-checked="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+label.check {
+  margin: 12px 0 0;
+  min-height: 0;
+}
+
+label.check input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+label.check > span:last-child {
+  width: auto;
+}
+
+.hint {
+  margin: 2px 0 0 23px;
+  font-size: 12px;
+  opacity: 0.65;
+}

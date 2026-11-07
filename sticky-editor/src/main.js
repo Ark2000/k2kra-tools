@@ -1,5 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Menu } from "@tauri-apps/api/menu";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -7,12 +8,12 @@ import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { render } from "./markdown.js";
+import { COLORS } from "./visuals.js";
 
 const AUTOSAVE_MS = 1000;
 const RETRY_MS = 3000;
 const POLL_MS = 2000;
 const MARKDOWN = /\.(md|markdown|mdown|mkd)$/i;
-const COLORS = ["Yellow", "Pink", "Orange", "Green", "Blue", "Purple", "Gray"];
 const OPACITIES = [100, 90, 80, 70, 60, 50, 40, 30];
 const TASK = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)[ xX]\]/;
 const REPO = "https://github.com/Ark2000/k2kra-tools/tree/main/sticky-editor";
@@ -42,6 +43,8 @@ let saveError = "";
 let missing = false; // the last disk check could not find the file
 let opacity = 100;
 let color = "yellow";
+let glass = true;
+let profile = null; // the profile this note follows, if any
 
 // ---- rendering ------------------------------------------------------------
 
@@ -122,6 +125,7 @@ function applyOpacity(percent) {
 function changeOpacity(percent) {
   const clamped = Math.min(100, Math.max(30, percent));
   applyOpacity(clamped);
+  profile = null;
   invoke("set_opacity", { opacity: clamped / 100 });
 }
 
@@ -132,6 +136,7 @@ function applyColor(name) {
 
 function changeColor(name) {
   applyColor(name);
+  profile = null;
   invoke("set_color", { color: name });
 }
 
@@ -261,6 +266,7 @@ const commands = {
     const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     applyTheme(theme);
     await invoke("set_theme", { theme });
+    profile = (await invoke("prefs")).profile;
   },
   async open() {
     const picked = await openDialog({ multiple: true });
@@ -286,12 +292,21 @@ ${ABOUT}`, {
         action: () => invoke("open_files", { paths: [path] }),
       };
     });
+    const { profiles } = await invoke("profiles");
     const noteItems = !doc
       ? []
       : [
           {
+            text: "Visual profile",
+            items: profiles.map(({ id, name }) => ({
+              text: name.replaceAll("&", "&&"),
+              checked: id === profile,
+              action: () => invoke("use_profile", { id }),
+            })),
+          },
+          {
             text: "Color",
-            items: COLORS.map((name) => ({
+            items: COLORS.map(({ name }) => ({
               text: name,
               checked: name.toLowerCase() === color,
               action: () => changeColor(name.toLowerCase()),
@@ -304,6 +319,15 @@ ${ABOUT}`, {
               checked: percent === opacity,
               action: () => changeOpacity(percent),
             })),
+          },
+          {
+            text: "Frosted glass",
+            checked: glass,
+            action: () => {
+              glass = !glass;
+              profile = null;
+              return invoke("set_glass", { glass });
+            },
           },
         ];
     const autostart = await isEnabled();
@@ -332,6 +356,7 @@ ${ABOUT}`, {
           action: () => (autostart ? disable() : enable()),
         },
         { item: "Separator" },
+        { text: "Settings…", action: () => invoke("open_settings") },
         { text: "About Sticky Editor", action: commands.about },
       ],
     });
@@ -405,12 +430,18 @@ document.addEventListener(
 
 // ---- startup --------------------------------------------------------------
 
-async function start() {
-  const prefs = await invoke("prefs");
-  pinned = prefs.pinned;
+function applyVisuals(prefs) {
   applyTheme(prefs.theme);
   applyOpacity(Math.round(prefs.opacity * 100));
   applyColor(prefs.color);
+  glass = prefs.glass;
+  profile = prefs.profile;
+}
+
+async function start() {
+  const prefs = await invoke("prefs");
+  pinned = prefs.pinned;
+  applyVisuals(prefs);
   $("toggle-pin").classList.toggle("active", pinned);
 
   try {
@@ -434,6 +465,8 @@ async function start() {
   await win.setFocus();
   if (doc && !previewing) editor.focus();
 }
+
+await listen("visual-changed", async () => applyVisuals(await invoke("prefs")));
 
 await win.onCloseRequested(async (event) => {
   const safe = await save();
