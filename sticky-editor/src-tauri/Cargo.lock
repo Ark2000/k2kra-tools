@@ -3344,8 +3344,9 @@ checksum = "ff7589a1859b09232522bb9edf076ca7fcf14ded96685d3fa629db73023ffbb7"
 
 [[package]]
 name = "sticky-editor"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
+ "base64 0.23.1",
  "chardetng",
  "dunce",
  "encoding_rs",

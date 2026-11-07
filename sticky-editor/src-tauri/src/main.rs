@@ -2,6 +2,8 @@
 
 mod doc;
 mod store;
+#[cfg(windows)]
+mod topmost;
 
 use serde::Serialize;
 use std::collections::hash_map::DefaultHasher;
@@ -282,6 +284,14 @@ fn doc_save(
     }
 }
 
+/// A Markdown image, resolved against the note's own folder.
+#[tauri::command(async)]
+fn doc_image(window: Window, state: tauri::State<AppState>, src: String) -> Result<String, String> {
+    let path = state.sessions.lock().unwrap().get(window.label()).map(|s| s.path.clone());
+    let dir = path.as_deref().and_then(Path::parent).ok_or("No document is open.")?;
+    doc::image_url(dir, &src)
+}
+
 /// `same`, `changed` or `deleted`, compared with what this window last saw.
 #[tauri::command(async)]
 fn doc_check(window: Window, state: tauri::State<AppState>) -> Result<&'static str, String> {
@@ -372,6 +382,11 @@ fn main() {
             });
             let handle = app.handle().clone();
             std::thread::spawn(move || save_periodically(handle));
+            #[cfg(windows)]
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || topmost::keep_pinned_on_top(handle));
+            }
 
             if std::env::args().any(|arg| arg == RESTORE) {
                 restore(app.handle());
@@ -389,6 +404,7 @@ fn main() {
             doc_load,
             doc_save,
             doc_check,
+            doc_image,
             set_pinned,
             set_opacity,
             set_color,

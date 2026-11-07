@@ -1,6 +1,7 @@
 //! Reading and writing real user files without disturbing them: encoding, BOM
 //! and line endings survive a save, and a write can never leave a half-written file.
 
+use base64::{engine::general_purpose::STANDARD, Engine};
 use encoding_rs::{Encoding as Legacy, UTF_16BE, UTF_16LE};
 use serde::Serialize;
 use std::collections::hash_map::DefaultHasher;
@@ -10,6 +11,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::time::SystemTime;
 
+const MAX_IMAGE_SIZE: u64 = 20 * 1024 * 1024;
 /// Above this a file opens read-only: a textarea gets sluggish.
 pub const MAX_EDITABLE: u64 = 5 * 1024 * 1024;
 /// Above this a file is refused outright.
@@ -296,6 +298,36 @@ pub fn save(path: &Path, doc: &mut Doc, text: &str, force: bool) -> Result<(), S
 }
 
 /// Writes a sibling temp file, then swaps it into place.
+fn image_type(path: &Path) -> Option<&'static str> {
+    let extension = path.extension()?.to_string_lossy().to_lowercase();
+    Some(match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        _ => return None,
+    })
+}
+
+/// Reads an image as a data URL. Network paths are refused: reading one would
+/// make Windows contact a server named by the file, as a remote image would.
+pub fn image_url(dir: &Path, src: &str) -> Result<String, String> {
+    let separator = |c: char| c == '\\' || c == '/';
+    if src.chars().take(2).filter(|c| separator(*c)).count() == 2 {
+        return Err("Network images are not loaded.".into());
+    }
+    let path = dir.join(src);
+    let mime = image_type(&path).ok_or("Not an image.")?;
+    let size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
+    if size > MAX_IMAGE_SIZE {
+        return Err("Image is too large.".into());
+    }
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(format!("data:{mime};base64,{}", STANDARD.encode(bytes)))
+}
+
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let dir = path.parent().ok_or(io::ErrorKind::InvalidInput)?;
     let name = path.file_name().ok_or(io::ErrorKind::InvalidInput)?.to_string_lossy();
@@ -348,6 +380,25 @@ fn swap_in(tmp: &Path, path: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn images_resolve_against_the_note_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join("assets")).unwrap();
+        fs::write(dir.path().join("assets/a b.PNG"), [1, 2, 3]).unwrap();
+        let url = image_url(dir.path(), "assets/a b.PNG").unwrap();
+        assert_eq!(url, "data:image/png;base64,AQID");
+    }
+
+    #[test]
+    fn images_refuse_network_paths_and_other_files() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("secret.txt"), "x").unwrap();
+        for src in [r"\\server\share\a.png", "//server/share/a.png", r"\/server\a.png"] {
+            assert_eq!(image_url(dir.path(), src).unwrap_err(), "Network images are not loaded.");
+        }
+        assert_eq!(image_url(dir.path(), "secret.txt").unwrap_err(), "Not an image.");
+    }
     use encoding_rs::{GBK, SHIFT_JIS};
 
     fn roundtrip(bytes: &[u8]) -> Decoded {

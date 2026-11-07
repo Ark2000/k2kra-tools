@@ -360,6 +360,32 @@ main {
   margin-left: -1.3em;
 }
 
+#preview .task-list-item-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0 6px 0 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 3px;
+  background: transparent center / 12px no-repeat;
+  vertical-align: -2px;
+  cursor: pointer;
+  appearance: none;
+}
+
+#preview .task-list-item-checkbox:checked {
+  border-color: #22a35a;
+  background-color: #22a35a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2.2'/%3E%3C/svg%3E");
+}
+
+#preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 8px;
+  border-radius: 4px;
+}
+
 #preview a {
   color: var(--accent);
 }

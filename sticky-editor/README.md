@@ -22,7 +22,7 @@ The menu button holds your recent files, the note's color and opacity, the dark 
 | `Ctrl+W` | Close |
 | `Ctrl+Wheel` | Change opacity |
 
-Double-clicking the preview also returns to editing.
+Markdown files open in the preview. Double-click it to edit, or tick a checkbox right there; the change saves like any other edit.
 
 ## How it treats your files
 
@@ -32,7 +32,7 @@ Double-clicking the preview also returns to editing.
 - **Opens read-only** when the file is marked read-only, is larger than 5 MB, or its encoding can't be detected with certainty. Mixed line endings are unified on save, and a notice says so when the file opens.
 - **Refuses** binary files and files over 20 MB.
 
-Markdown preview runs no scripts and shows raw HTML as plain text. Images are not loaded: each appears as a link, so a file can't call out to a remote server. Links open in your browser.
+Markdown preview runs no scripts and shows raw HTML as plain text. Images from your computer are shown, with paths relative to the note. Remote and network images are not loaded: each appears as a link, so a file can't call out to a server. Links open in your browser.
 
 ## Build
 

@@ -14,6 +14,7 @@ const POLL_MS = 2000;
 const MARKDOWN = /\.(md|markdown|mdown|mkd)$/i;
 const COLORS = ["Yellow", "Pink", "Orange", "Green", "Blue", "Purple", "Gray"];
 const OPACITIES = [100, 90, 80, 70, 60, 50, 40, 30];
+const TASK = /^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+\[)[ xX]\]/;
 const REPO = "https://github.com/Ark2000/k2kra-tools/tree/main/sticky-editor";
 const ABOUT = `Open any text file as a floating note. Edits save themselves, and Markdown files render in place.
 
@@ -49,18 +50,44 @@ function showStatus() {
   const state = doc.readonly
     ? "Read-only"
     : saveError || (dirty ? "Editing…" : "Saved");
-  $("status").textContent = `${doc.encoding} · ${doc.eol} · ${state}`;
+  const hint = previewing && !doc.readonly ? " · Double-click to edit" : "";
+  $("status").textContent = `${doc.encoding} · ${doc.eol} · ${state}${hint}`;
   $("status").classList.toggle("error", Boolean(saveError));
   $("title").classList.toggle("dirty", dirty);
 }
 
 function setMode(wantPreview) {
   previewing = wantPreview;
-  if (previewing) preview.innerHTML = render(editor.value);
+  if (previewing) {
+    preview.innerHTML = render(editor.value);
+    showImages();
+  }
   preview.hidden = !previewing;
   editor.hidden = previewing;
   $("toggle-preview").classList.toggle("active", previewing);
+  showStatus();
   if (!previewing) editor.focus();
+}
+
+function showImages() {
+  for (const image of preview.querySelectorAll("img[data-src]")) {
+    invoke("doc_image", { src: image.dataset.src })
+      .then((url) => (image.src = url))
+      .catch(() => image.replaceWith(`[${image.alt || "image"}]`));
+  }
+}
+
+/** Writes a preview checkbox back to its line. False if it can't be written. */
+function saveTask(box) {
+  if (doc.readonly) return false;
+  const lines = editor.value.split("\n");
+  const line = Number(box.dataset.line);
+  const match = TASK.exec(lines[line] ?? "");
+  if (!match) return false;
+  const start = lines.slice(0, line).join("\n").length + (line > 0 ? 1 : 0) + match[1].length;
+  editor.setRangeText(box.checked ? "x" : " ", start, start + 1);
+  editor.dispatchEvent(new Event("input"));
+  return true;
 }
 
 function showBanner(text, actions = []) {
@@ -344,9 +371,15 @@ editor.addEventListener("keydown", (event) => {
   document.execCommand("insertText", false, "\t"); // keeps native undo intact
 });
 
-preview.addEventListener("dblclick", () => setMode(false));
+preview.addEventListener("dblclick", (event) => {
+  if (!event.target.matches("input")) setMode(false);
+});
 
 preview.addEventListener("click", (event) => {
+  if (event.target.matches("input[type=checkbox]")) {
+    if (!saveTask(event.target)) event.preventDefault();
+    return;
+  }
   const link = event.target.closest("a[href]");
   if (!link) return;
   event.preventDefault();
