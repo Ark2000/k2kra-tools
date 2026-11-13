@@ -28,6 +28,16 @@ const SETTINGS: &str = "settings";
 /// Passed by the sign-in entry: reopen the last notes, or quietly do nothing.
 const RESTORE: &str = "--restore";
 const STORE_SAVE_INTERVAL: Duration = Duration::from_secs(2);
+/// Mirrors `min_inner_size`: a note cannot be dragged smaller than this.
+const MIN_NOTE_WIDTH: u32 = 220;
+const MIN_NOTE_HEIGHT: u32 = 140;
+
+/// Minimising a window makes Windows report a tiny (or zero) client area, and
+/// tao forwards it as an ordinary `Resized` event. Only a size a user could
+/// actually drag the window to is worth remembering or restoring.
+fn usable_size((w, h): (u32, u32)) -> bool {
+    w >= MIN_NOTE_WIDTH && h >= MIN_NOTE_HEIGHT
+}
 
 /// The file behind one note window. Commands find it by window label, so the
 /// webview can only ever touch the file its window was opened on.
@@ -142,7 +152,8 @@ fn note_window(
         .build()?;
 
     window.set_effects(glass_effects(saved))?;
-    if let Some((w, h)) = saved.size {
+    // Old state files may hold a size captured while the window was minimised.
+    if let Some((w, h)) = saved.size.filter(|&size| usable_size(size)) {
         window.set_size(PhysicalSize::new(w, h))?;
     }
     if let Some((x, y)) = saved.position.filter(|p| on_screen(&window, *p)) {
@@ -457,11 +468,13 @@ fn remember(window: &Window, state: &AppState, update: impl FnOnce(&mut FileStat
 fn on_window_event(window: &Window, event: &WindowEvent) {
     let state = window.state::<AppState>();
     match event {
-        // Minimised windows report sentinel values; don't remember those.
+        // Minimised windows report sentinel positions.
         WindowEvent::Moved(p) if p.x > -30000 && p.y > -30000 => {
             remember(window, &state, |file| file.position = Some((p.x, p.y)));
         }
-        WindowEvent::Resized(s) if s.width > 0 && s.height > 0 => {
+        // A minimised window also reports a tiny size; saving it would make the
+        // note come back as a title-bar-only sliver on the next launch.
+        WindowEvent::Resized(s) if usable_size((s.width, s.height)) => {
             remember(window, &state, |file| file.size = Some((s.width, s.height)));
         }
         // Without this the glass goes solid until the next check.

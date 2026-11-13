@@ -439,31 +439,37 @@ function applyVisuals(prefs) {
 }
 
 async function start() {
-  const prefs = await invoke("prefs");
-  pinned = prefs.pinned;
-  applyVisuals(prefs);
-  $("toggle-pin").classList.toggle("active", pinned);
-
   try {
-    await loadDoc();
-    if (doc) {
-      $("title").textContent = doc.name;
-      $("title").title = doc.path;
-      const markdown = MARKDOWN.test(doc.name);
-      $("toggle-preview").hidden = !markdown;
-      setMode(markdown && editor.value.length > 0);
-    } else {
-      $("title").textContent = "Sticky Editor";
-      showMessage("Drop a file here, or press Ctrl+O");
+    const prefs = await invoke("prefs");
+    pinned = prefs.pinned;
+    applyVisuals(prefs);
+    $("toggle-pin").classList.toggle("active", pinned);
+
+    try {
+      await loadDoc();
+      if (doc) {
+        $("title").textContent = doc.name;
+        $("title").title = doc.path;
+        const markdown = MARKDOWN.test(doc.name);
+        $("toggle-preview").hidden = !markdown;
+        setMode(markdown && editor.value.length > 0);
+      } else {
+        $("title").textContent = "Sticky Editor";
+        showMessage("Drop a file here, or press Ctrl+O");
+      }
+    } catch (error) {
+      $("title").textContent = "Cannot open file";
+      showMessage(String(error));
     }
   } catch (error) {
-    $("title").textContent = "Cannot open file";
+    $("title").textContent = "Sticky Editor";
     showMessage(String(error));
+  } finally {
+    // The window is built hidden. Whatever failed above, it must still appear.
+    await win.show();
+    await win.setFocus();
+    if (doc && !previewing) editor.focus();
   }
-
-  await win.show();
-  await win.setFocus();
-  if (doc && !previewing) editor.focus();
 }
 
 await listen("visual-changed", async () => applyVisuals(await invoke("prefs")));
